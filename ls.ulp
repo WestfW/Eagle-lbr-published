@@ -1,0 +1,17 @@
+string file;
+string h="";
+
+if (board) board(B) { file = B.name;}
+else if (schematic) schematic(S){ file = S.name; }
+
+system("ls -l " + file + ">tmpfile.tmp");
+string filestatus;
+fileread(filestatus, "tmpfile.tmp");
+status(filestatus);
+system("sleep 5");
+if (filestatus[2] != 'w') {
+   status("File \""+filename(file)+"\" is not writable");
+   h = "menu CHECKOUT;";
+   system("sleep 5");
+}
+exit(h);

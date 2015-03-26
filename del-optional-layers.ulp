@@ -1,0 +1,23 @@
+string cmd = "";
+string f;
+
+board(B) {
+    B.layers(L) {
+	if (L.number >= LAYER_USER) {
+	    sprintf(f, "layer -%d;\n", L.number);
+	    cmd += f;
+	}
+    }
+}
+int Result=1;
+Result = dlgDialog("Script to remove User Layers") {
+    dlgTextEdit(cmd);
+    dlgHBoxLayout {
+	dlgPushButton("+Execute") dlgAccept();
+	dlgPushButton("-Cancel") dlgReject();
+    }
+};
+
+if (Result == 0) exit(0);
+
+exit(cmd);

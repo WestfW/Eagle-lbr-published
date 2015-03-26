@@ -1,0 +1,32 @@
+#usage "<b> Add uplines to text. "
+       "           run upline [layer] \n";
+
+real linewidth;
+string cmd = "";
+
+void display (string s) {
+  dlgMessageBox(s);
+  return;
+}
+
+void do_text(UL_TEXT T)
+{
+    string p = T.value;
+    int l=strlen(p);
+    real x, y;
+    int pos = strchr('\\');
+    if (pos < 0)
+	return;
+
+    x= u2mm(T.x);
+    y= u2mm(T.y + T.size);
+
+}
+
+schematic(Sch) {
+    SCH.sheets(S) {
+	S.text(T) {
+	    do_text(T);
+	}
+    }
+}

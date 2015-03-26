@@ -1,0 +1,39 @@
+/*
+ * Try to detect a "new" board; one that has been created for the
+ * first time from a schematic.
+ * Since by default the components are placed in quadrant 2 (x<0, y>0),
+ * We'll check the halfplane (x>0).  If there is "stuff" there, we can
+ * assume that this is not a freshly created board.
+ */
+
+#usage	"Detect freshly created (from a schematic) boards\n"
+	"Usage: RUN newboardtest.ulp 'commands for new' 'commands for old'\n"
+	"Author: Bill Westfield (westfw@yahoo.com)";
+
+string OldCommands, NewCommands;
+
+if (argc > 1) {
+    NewCommands = argv[1];
+} else {
+    NewCommands = "";
+}
+
+if (argc > 2) {
+    OldCommands = argv[2];
+} else {
+    OldCommands = "";
+}
+
+if (board) board(B) {
+    B.elements(E) {
+	if (E.x > 0 && E.y > 0) {
+	    exit (OldCommands);
+	}
+    }
+    B.wires(W) {
+	if (W.layer != 20 && (W.x1 > 0 || W.x2 > 0)) {
+	    exit (OldCommands);
+	}
+    }
+    exit(NewCommands);
+}

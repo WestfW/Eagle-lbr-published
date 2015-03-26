@@ -1,0 +1,10 @@
+grid mm;
+layer 20;
+#
+# Business card
+wire 0 (0 50) (90 50) (90 0);
+#
+# 1x2 inch
+wire 0 (0 25.4) (50.8 25.4) (50.8 0);
+layer 16;
+grid last;

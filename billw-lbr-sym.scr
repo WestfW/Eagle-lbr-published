@@ -1,0 +1,22 @@
+run newboardtest 'script default-outlines.scr;'
+
+grid mm;
+set WIDTH_MENU 0 .1 .2 .4 .6;
+change length short;
+grid last;
+
+menu	'Layers {\
+	    All : display ALL; | \
+	    NoPins : display -pins; | \
+	    AddPins: display pins; | \
+	    NoNames : display -names -values; \
+	}' \
+	'Grid {\
+	  Toggle : run gridhalf 1 t ; info | \
+	  Smaller : run gridhalf 0.5; move | \
+	  Bigger : run gridhalf 2; move   | \
+          OnOff : grid; move \
+	}' \
+	'Circle : run circle;' \
+    ;
+    

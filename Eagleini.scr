@@ -1,0 +1,15 @@
+menu	'Layers {\
+	    Top : display NONE top pads vias dimension unrouted; | \
+	    Bottom : display NONE bottom pads vias dimension unrouted; | \
+	    All : display top bottom pads vias dimension unrouted tplace \
+		torigins tkeepout bplace borigins bkeepout; | \
+	    NoNames : display -tnames -tvalues -bnames -bvalues; \
+	}' \
+	'Grid {\
+	  Metric : grid mm; | \
+	  English : grid inch; \
+          On/Off : grid; \
+	}' \
+	'Circle : run circle;' \
+    ;
+    

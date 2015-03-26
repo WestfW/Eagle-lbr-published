@@ -1,0 +1,25 @@
+/*
+ * "ripup" all the signal polygons on a board. (that is,
+ * return them to their unfilled state; this shouldn't
+ * actually ripup any routed signals unless you happen
+ * to have a signal at the exact start point of the first
+ * wire of a polygon.
+ */ 
+
+board(B) {
+    string s;
+    string cmd = "grid mm; ";
+
+    B.signals(S) {
+	S.polygons(P) {
+	    P.wires(W) {
+		s="";
+		sprintf(s, "ripup (%f %f);", u2mm(W.x1), u2mm(W.y1));
+		cmd+=s;
+		break;
+	    }
+	}
+    }
+    cmd += "grid last;";
+    exit(cmd);
+}

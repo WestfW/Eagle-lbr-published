@@ -1,0 +1,115 @@
+/*
+ * lbrutil.ulp
+ * A set of utilities for helping design libraries.
+ *
+ * lbrutil p(ins) NAM<n>..<m>  create pins NAMn through NAMm
+ *
+ */
+
+real pinplacex = -0.1,
+    pinplacey = 0.0,
+    pinplaceincr = 0.1;
+
+string command, argument;
+string tmpstr, retstr;
+
+string pinname;
+int  first, last;
+
+
+void Fatal(string Message, string Details)
+{
+  dlgMessageBox(usage + "<hr><b>ERROR: " + Message + "</b><p>\n" + Details);
+  exit(1);
+}
+
+void display (string s) {
+  dlgMessageBox(s);
+  return;
+}
+
+/* ---------------------------------------------------------------------- */
+
+void dialog_pins (void)
+{
+    Fatal("Need Pin names", "");
+}
+
+
+/*
+ * parse_pins
+ * parse a string nameXXX..YYY yielding name, first, and last (globals.)
+ */
+
+void parse_pins (string argument)
+
+{
+    int i,j;
+
+    for (i=0; i < strlen(argument); i++) {
+	if (isdigit(argument[i])) {
+	    /*
+	     * Found first digit
+	     */
+	    first = strtol(strsub(argument, i));
+	    j = strrstr(argument, "..") + 2;
+	    if (j < i) {
+		Fatal("Bad format for pinnames", argument);
+	    }
+	    last = strtol(strsub(argument, j));
+	    break;
+	}
+	pinname += argument[i];
+    }
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* MAIN        */
+/* ---------------------------------------------------------------------- */
+
+void main (void) 
+{
+    int i, j;
+    string mycmd = "";
+
+    if (argc < 2) {
+	Fatal("Expected Arguments", "");
+    }
+    command = argv[1];
+    argument = argv[2];
+
+    if (command[0] == 'p') {
+	first = last = 0;
+	pinname = "";
+	if (symbol) {
+	    mycmd = "pin";
+	} else if (package) {
+	    mycmd = "pad";
+	}
+
+	/*
+	 * Pins nam0..9
+	 */
+	if (argc < 3) {
+	    dialog_pins();
+	} else {
+	    parse_pins(argv[2]);
+	}
+	sprintf(tmpstr, "Pins name %s\nFrom %d to %d", pinname, first, last);
+//	display(tmpstr);
+	j = 0;
+	for (i=first; i <= last; i++) {
+	    sprintf(tmpstr, "%s '%s%d' (%f %f); ", mycmd, pinname, i,
+		    pinplacex, pinplacey + (j++ * pinplaceincr));
+	    retstr += tmpstr;
+	}
+	
+	exit(retstr);
+    } else if (command[0] == ' ') {
+    }
+}
+
+main();					/* everything read; run it. */
+
+

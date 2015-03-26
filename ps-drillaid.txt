@@ -1,0 +1,86 @@
+% Several people have wanted to have drill-aid style functions available
+% when in the CAM process (drill-aid.ulp is a utility that fills in MOST
+% of the hold area of pads/etc so that the hole in the copper left by
+% photo or hobbyist plotting/etching techniques acts as a pilot hole for
+% drills, rather than matching the full size of the drill.)  This is very
+% handy for manual or non-CNC drilling.
+% However, this has not worked from the CAM processor; only via PRINTing,
+% which has assorted drawbacks if you're going to do further processing of
+% the output files.  :-(
+% 
+% You CAN acheive drill-aid style processing via the CAM processor, at
+% least for postscript and embedded-postscript if you define a couple
+%  of new output devices that constrain the size of the "holes" they print.
+% Use something like the following text added to eagle.def after you've
+% changed the "5000" to whatever you prefer for the shrunken hole size
+% (in 1/10000 mms, so 5000 = 0.5mm, etc) 
+% Author: Bill Westfield <westfw@yahoo.com>
+% 
+
+[EPS-Drillaid]
+
+@EPS
+Long     = "Postscript with max hole size in pads/etc, ala drill-aid.ulp"
+
+Header3  = "%% redefine our /h function with a fixed diameter\n"\
+           "/h {  %% draw a hole\n"\
+           "   /d  exch def\n  %% Still need to pop diam off stack\n"\
+           "   d 5000 gt {\n"\
+           "      /d  5000 def\n  %% But override it to 0.5mm\n"\
+           "   } if\n"\
+           "   /y  exch def\n"\
+           "   /x  exch def\n"\
+           "   d 0 gt {\n"\
+           "     newpath\n"\
+           "     x EU y EU d 2 div EU 0 360 arc\n"\
+           "     currentgray dup\n"\
+           "     1 exch sub setgray\n"\
+           "     fill\n"\
+           "     setgray\n"\
+           "     } if\n"\
+           "   } def\n"\
+           "%% The drawing\n"
+
+
+[PS-Drillaid]
+
+@PS
+Long     = "Postscript (printable) with max hold size ala Drill-aid.ulp"
+
+Header2  = "%% redefine our /h function with a fixed diameter\n"\
+           "/h {  %% draw a hole\n"\
+           "   /d  exch def\n  %% Still need to pop diam off stack\n"\
+           "   d 5000 gt {\n"\
+           "      /d  5000 def\n  %% But override it to 0.5mm\n"\
+           "   } if\n"\
+           "   /y  exch def\n"\
+           "   /x  exch def\n"\
+           "   d 0 gt {\n"\
+           "     newpath\n"\
+           "     x EU y EU d 2 div EU 0 360 arc\n"\
+           "     currentgray dup\n"\
+           "     1 exch sub setgray\n"\
+           "     fill\n"\
+           "     setgray\n"\
+           "     } if\n"\
+           "   } def\n"\
+           "%% Remainder of Header2 copied from define for PS device\n"\
+           "%% the real drawing size:\n"\
+           "\n"\
+           "/MinDrawX %6d EU def\n"\
+           "/MinDrawY %6d EU def\n"\
+           "/MaxDrawX %6d EU def\n"\
+           "/MaxDrawY %6d EU def\n"\
+           "\n"\
+           "%% the usable page size:\n"\
+           "\n"\
+           "/LeftMargin 0.25 inch def  %% change these if drawing gets clipped!\n"\
+           "/BotMargin  0.25 inch def\n"\
+           "/PageWidth  %7.4f inch def\n"\
+           "/PageHeight %7.4f inch def\n"\
+           "\n"\
+           "%% are we going to rotate?:\n"\
+           "\n"\
+           "/RotateDrawing %d 0 ne def\n"\
+           "\n"
+           ;(x1, y1, x2, y2, Width, Height, DoRotate) 

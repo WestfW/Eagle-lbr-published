@@ -1,0 +1,27 @@
+string setclasses = "\
+grid mm;\
+Class 1 power 1.0;\
+Class 0 default 0.6;\
+grid last; ";
+
+void display (string s) {
+  dlgMessageBox(s);
+  return;
+}
+
+if (schematic && !board) schematic(S) {
+    S.classes(C) {
+        if (C.name == "default") {
+	    continue;
+	} else if
+	         (C.name == "") {
+	            exit(setclasses);
+	} else {
+	    display("Non-Null Class\""+C.name+"\" Found" +
+	    "in schematics already");
+  	    exit("");
+	}
+    }
+    display("End of Program Reached");
+}
+

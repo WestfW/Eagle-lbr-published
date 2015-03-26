@@ -1,0 +1,41 @@
+run newboardtest 'script default-outlines.scr;'
+
+grid mm;
+
+set WIDTH_MENU 0 .2 .4 .6 .8 1 1.5 2 3;
+
+change width .8;
+change drill .8;
+change isolate .4;
+change thermals off;
+ratsnest;
+
+menu	'Layers {\
+	    Top : display NONE top torigins tKeepout tRestrict borigins pads vias dimension unrouted; | \
+	    Bottom : display NONE bottom borigins bKeepout bRestrict torigins pads vias dimension unrouted; | \
+	    All : display top bottom pads vias dimension unrouted tplace \
+		torigins tnames tvalues bnames bvalues trestrict bplace borigins brestrict Document ?? Edit_history; | \
+	    NoNames : display -tnames -tvalues -bnames -bvalues; | \
+	    noDocu : display -tdocu -bdocu; | \
+	    AddDocu:  display tdocu bdocu Document ?? Edit_History; | \
+	    SilkScreen: display NONE tplace -tvalues -tdocu dimension top tStop; \
+	}' \
+	'TogScreen : run toglays 21 22 25 26 27 28 51 52;' \
+	'DrawOn {\
+	    Top : change layer top; | \
+	    Bottom : change layer bottom; | \
+	    tPlace : change layer tPlace; | \
+	    Dim : change layer Dimension; | \
+	    History: change layer History; \
+	}' \
+	'Grid {\
+	  Toggle : run gridhalf 1 t ; info | \
+	  Smaller : run gridhalf 0.5; move | \
+	  Bigger : run gridhalf 2; move   | \
+          OnOff : grid; move \
+	}' \
+	'Circle : run circle;' \
+	'Count : run count;' \
+	'DrlAid : run drill-aid;' \
+	'RipPoly : ripup @;' \
+    ;

@@ -1,0 +1,380 @@
+#usage "<b>Creates a drawing template</b>\n"
+       "<p>"
+       "Generates a ISO paper standard frame with info field."
+       "<p>"
+       "<author>Author: Bill Westfield <westfw@Yahoo.com>, based on frame.ulp by</author>"
+       "<author>: Richard Bekking <richard.bekking@gmail.com></author>"
+
+// THIS PROGRAM IS PROVIDED AS IS AND WITHOUT WARRANTY OF ANY KIND, EXPRESSED OR IMPLIED
+
+string cmd = "";
+
+// User info
+string company = "      Nuts & Bolts Software";
+string engineer = "Bill Westfield";
+string checked = "<name>";
+string aproved = "<name>";
+string description1 = "<descriptive text>";
+string description2 = "<descriptive text>";
+string description3 = "<descriptive text>";
+string copyright = "Copyright(C) 2006 by Bill Westfield";
+int copyright_select = 1;
+
+// Paper style
+string papersize[] = {"A4", "A3", "A2"};
+int papersize_select = 0;
+string orientation[] = {"L", "P"};
+int orientation_select = 0;
+string perforation[] = {"none", "top", "left", "right", "bottom"};
+string perforation_code[] = {"", "-HT", "-HL", "-HR", "-HB"};
+int perforation_select = 0;
+int clearance = 8;
+
+int result;
+
+/*
+ * expected size of a drawing to fit into a normal sized page
+ */
+real standard_x = 10 * 25.4;			/* Real width 10 inches */
+real standard_y = 7.5* 25.4;			/* real height 7.5 inches */
+
+real Stamp_Fraction_X = .4;		/* Horz fraction used by Stamp */
+real Stamp_Fraction_Y = .15;		/* Vert  fraction used by Stamp */
+/*
+ * The frame is a double box starting at 0,0 and going <margin> beyond the
+ *  upper right corner of the existing drawing, except that standard paper
+ *  sheet proportions are maintained.  It has an information stamp
+ *  in the lower right that occupies 1/3 of the horizontal size and 1/8 of the
+ *  vertical size.  The stamp has 6 lines of info:
+ *  Engineer:   | name            | date:| date
+ *  Description:| desc 1          |
+ *              | desc 2	  | Page:| n/m
+ *  		| desc 3	  |
+ *  Filename:   | filname         | Version:| x.y
+ *  font height is 1/8 * 1/8 * vertsize
+ */
+
+real vertsize, horisize, scalefactor;
+
+
+string variable_val_by_name (string name)
+{
+    if (board) board(B) {
+	B.elements(E) {
+	    if (E.name == name)
+		return E.value;
+	}
+    } else if (schematic) schematic(SCH) {
+	SCH.parts(P) {
+	    if (P.name == name)
+		return P.value;
+	}
+    }
+    return "";
+}
+
+
+int calculate_pagesize(UL_SHEET sh)
+{
+    /*
+     * calculate a page size by getting the max of fraction of a
+     * "standard" page size is occupied by the drawing
+     */
+    real hsize, vsize;
+    string s;
+
+    hsize = u2mm(sh.area.x2 - sh.area.x1);
+    vsize = u2mm(sh.area.y2 - sh.area.y1);
+    sprintf(s, "drawingsize %f, %f\nrealsize %f %f", hsize, vsize,
+	    standard_x, standard_y);
+//    dlgMessageBox(s);
+
+    if (hsize/standard_x > vsize/standard_y) {
+	/* horizontal ratio is bigger. */
+	scalefactor = hsize/standard_x;
+    } else {
+	scalefactor = vsize/standard_y;
+    }
+    sprintf(s, "scalefactor %f", scalefactor);
+//    dlgMessageBox(s);
+
+    vertsize = standard_y * scalefactor;
+    horisize = standard_x * scalefactor;
+    sprintf(s, "newsize x,y = %f, %f", horisize, vertsize);
+//    dlgMessageBox(s);
+    return(1);
+}
+
+string realToStr(real number)
+{	
+	string retVal = "";
+	sprintf(retVal, "%f", number);
+	return retVal;
+}
+
+string intToStr(int number)
+{	
+	string retVal = "";
+	sprintf(retVal, "%d", number);
+	return retVal;
+}
+
+string drawLine(real x, real y, real x2, real y2)
+{
+	string cmd = "";
+	cmd += "WIRE (" + realToStr(x) + " " + realToStr(y) + ") (" + realToStr(x2) + " " + realToStr(y2) + ");";
+	return cmd;
+}
+
+string drawBox(real x, real y, real width, real height, int style)
+{
+	string cmd = "", msg = "";
+	real y2 = (y + height);
+	real x2 = (x + width);
+
+	sprintf(msg, "drawbox %f %f %f, %f", x, y, width, height);
+//	dlgMessageBox(msg);
+
+	switch(style)
+	{
+		case 0: cmd += "CHANGE STYLE Continuous;"; break;
+		case 1: cmd += "CHANGE STYLE LongDash;"; break;
+		case 2: cmd += "CHANGE STYLE ShortDash;"; break;
+		case 3: cmd += "CHANGE STYLE DashDot;"; break;
+		default: break;
+	}
+
+	cmd += drawLine(x, y, x, y2);
+	cmd += drawLine(x, y2, x2, y2);
+	cmd += drawLine(x2, y2, x2, y);
+	cmd += drawLine(x2, y, x, y);
+	return cmd;
+}
+
+real SMALLFONT = 0.5;
+real BIGFONT = 0.6;
+int BOLDFACE = 16;
+int NORMFACE = 8;
+
+/*
+ * Draw a vertical line at the beginning of a Stamp field
+ */
+string StampVLine(int line, real field)
+{
+    real x, xorig, y, xsize, ystep, fontsize;
+
+    xorig = horisize * (1-Stamp_Fraction_X);
+    xsize = (horisize + 10) - xorig;
+    x = xorig + (field * xsize/5);
+
+    ystep = (vertsize / 6) * Stamp_Fraction_Y;
+    y = ystep * real(line);
+    return(drawLine(x,y, x, y+ystep));
+}
+/*
+ * Draw some text in a Stamp field.
+ * Line number starts at zero from the bottom, fields zero from the left.
+ */
+string StampText (int line, real field, int face, real scale, string text)
+{
+    real x, xorig, y, xsize, ystep, fontsize;
+    string cmd = "";
+
+    xorig = horisize * (1-Stamp_Fraction_X);
+    xsize = (horisize + 10) - xorig;
+    x = xorig + (field * xsize/5) + 2*scalefactor;
+
+    ystep = (vertsize / 6) * Stamp_Fraction_Y;
+    fontsize = ystep * scale;
+
+    y = ystep * real(line) + (ystep-fontsize)/2;
+    
+    sprintf(cmd, "CHANGE FONT VECTOR; CHANGE SIZE %f; CHANGE RATIO %d; TEXT '%s' R0 (%f %f);\n",
+	    fontsize, face, text, x, y);
+//    dlgMessageBox(cmd);	    
+    return(cmd);
+}
+
+string drawStamp(real x, real y, int papersize,
+		string company,
+		string engineer,
+		string checked,
+		string aproved,
+		string description1,
+		string description2,
+		string description3,
+		string revision,
+		string copyright)
+{
+	string cmd = "";
+	real ystep, fontsize;
+	real xedge;
+
+	x = horisize * (1-Stamp_Fraction_X);
+	y = 0;
+	xedge = horisize + 10;
+	ystep = (vertsize / 6) * Stamp_Fraction_Y;
+
+	cmd += drawBox(x, y, xedge-x, y + (ystep*6), 0);
+	cmd += drawLine(x, y + ystep, xedge, y + ystep);
+	cmd += drawLine(x, y + ystep*4, xedge, y + ystep*4);
+	cmd += drawLine(x, y + ystep*5, xedge, y + ystep*5);
+
+	if (board)
+	{
+		cmd += drawLine(x + 97, y + 22, x + 97, y + 31);
+	}
+//	cmd += drawLine(x + 101, y, x + 101, y + 12);
+
+	/*
+	 * Draw fields
+	 */
+	cmd += StampText(5, 0, BOLDFACE, BIGFONT, "  " + company);
+
+	cmd += StampVLine(4, 1);
+	cmd += StampText(4, 0, NORMFACE, BIGFONT, "Engineer");
+	cmd += StampText(4, 1, BOLDFACE, BIGFONT, engineer);
+	cmd += StampVLine(4,3);
+//	cmd += StampText(4, 3, NORMFACE, BIGFONT, "Date");
+	cmd += StampText(4,3, BOLDFACE, SMALLFONT,">LAST_DATE_TIME");
+
+	cmd += StampVLine(1, 1) + StampVLine(2, 1) + StampVLine(3, 1);
+	cmd += StampText(3, 0, NORMFACE, SMALLFONT, "Description");
+	cmd += StampVLine(1, 4) + StampVLine(2, 4) + StampVLine(3, 4);
+	cmd += StampText(3, 1, NORMFACE, SMALLFONT, description1);
+	cmd += StampText(2, 1, NORMFACE, SMALLFONT, description2);
+	cmd += StampText(1, 1, NORMFACE, SMALLFONT, description3);
+	cmd += StampText(3, 4, NORMFACE, SMALLFONT, " Page:");
+	cmd += StampText(2, 4, NORMFACE, SMALLFONT, "  1 of 1");
+			 
+	cmd += StampVLine(0, 1);
+	cmd += StampText(0, 0, NORMFACE, BIGFONT, "Filename");
+	cmd += StampText(0, 1, BOLDFACE, SMALLFONT, ">Drawing_name");
+        cmd += StampText(0, 3.5, NORMFACE, SMALLFONT, "Version");
+	cmd += StampText(0, 4.2, BOLDFACE, BIGFONT, revision);
+
+	return(cmd);
+}
+
+string revision;
+
+string drawFrame(int papersize, int orientation, int perforation, int clearance)
+{
+	string cmd = "";
+	string msg;
+	real x = 0, y = 0, w = 0, h = 0;
+	real width = 0, height = 0;
+	int spacing = 24 - clearance;	// mm
+	int sheetnum = 1;
+	real rclr;
+	cmd += "GRID MM 1 1;";
+	cmd += "LAYER 100 DocFrame;";
+	cmd += "SET COLOR_LAYER 100 BLACK;";
+
+	switch(perforation)
+	{
+		case 0:	break;
+		case 1: // TOP
+			h = spacing;
+			break;
+		case 2: // LEFT
+			x = spacing; w = spacing;
+			break;
+		case 3: // RIGHT
+			w = spacing;
+			break;
+		case 4: // BOTTOM
+			y = spacing; h = spacing;
+			break;
+	}
+	
+	if (schematic) schematic(sch) sch.sheets(s) {
+	    calculate_pagesize(s);
+	    cmd += "edit .s"+intToStr(sheetnum) + "; ";
+	    cmd += "CHANGE WIDTH " + realToStr(0.254 * scalefactor) +";\n";
+	    width = horisize + 10;
+	    height = vertsize + 10;
+	    rclr = real(clearance) * scalefactor;
+	    sprintf(msg, "clearance %d, scale %f, rclr %f", clearance,
+		    scalefactor, rclr);
+//	    dlgMessageBox(msg);	    
+	    if (copyright_select == 0) copyright = "";
+	    cmd += drawBox(0, 0, width, height, 0);
+	    cmd += drawBox(x - rclr,  y - rclr,
+		   width + (2*rclr ) - w, height + (2*rclr ) - h, 2);
+	cmd += drawStamp(width - (110 + clearance) - (w - x), clearance  + y, papersize, company, engineer, checked, aproved, description1, description2, description3, revision, copyright);
+	    sheetnum += 1;
+	}
+	cmd += "GRID DEFAULT;";
+	return cmd;
+}
+
+revision = variable_val_by_name("VS1");
+
+result = dlgDialog("Insert drawing frame") {
+	dlgStretch(0);
+	dlgHBoxLayout 
+	{	
+		dlgGroup("Drawing data")
+		{
+			dlgGridLayout 
+			{
+				dlgCell(0, 0) dlgLabel("&Company");
+				dlgCell(0, 1) dlgStringEdit(company);
+				dlgCell(1, 0) dlgLabel("&Engineer");	
+				dlgCell(1, 1) dlgStringEdit(engineer);
+				dlgCell(2, 0) dlgLabel("&Checked");
+				dlgCell(2, 1) dlgStringEdit(checked);
+				dlgCell(3, 0) dlgLabel("&Aproved");
+				dlgCell(3, 1) dlgStringEdit(aproved);
+
+				dlgCell(4, 0) dlgLabel("");
+
+				dlgCell(5, 0) dlgLabel("&Description");
+				dlgCell(5, 1) dlgStringEdit(description1);
+				dlgCell(6, 1) dlgStringEdit(description2);
+				dlgCell(7, 1) dlgStringEdit(description3);
+
+				dlgCell(8, 0) dlgLabel("");
+
+				dlgCell(9, 0) dlgCheckBox("Copyright", copyright_select);
+				dlgCell(9, 1) dlgStringEdit(copyright);
+				dlgCell(10, 1) dlgSpacing(200);
+			}
+		}
+
+		dlgGroup("Paper settings")
+		{
+			dlgLabel("Size");
+			dlgComboBox(papersize, papersize_select);
+
+			dlgGroup("Orientation")
+			{
+				dlgRadioButton("&Landscape", orientation_select);
+				dlgRadioButton("&Portrait", orientation_select);
+			}
+
+			dlgLabel("Perforation space");
+			dlgComboBox(perforation, perforation_select);
+			dlgLabel("Edge clearance [mm]");
+			dlgSpinBox(clearance, 5, 24);
+		}
+	}
+
+	dlgHBoxLayout
+	{
+		dlgStretch(0);
+		dlgPushButton("+Ok") dlgAccept();
+		dlgPushButton("Reset") dlgReset();
+		dlgPushButton("-Cancel") dlgReject();
+	}
+};
+
+if (!result) exit(0);
+
+int i = (papersize_select * 2) + orientation_select;
+
+cmd += drawFrame(papersize_select, orientation_select, perforation_select, clearance);
+cmd += "WINDOW FIT;";
+cmd += "SET ;";
+exit(cmd);

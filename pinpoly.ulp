@@ -1,0 +1,106 @@
+#usage "<b>create polygons around each pad in a circuit, with the goal\n"
+    "of making a sort of self-adapting restring behavior </b>"
+
+    "<p>"
+    "Draws square polygons around each pad of the indicated size, "
+    "attempting to change polygon rank so that adjacent polygons "
+    "will automatically avoid each other based on DRC, signal class "
+    "and isolate parameters."
+    "<p>"
+    "This only works so-so, and you have to do a careful DRC to check "
+    "for colliding polygons after running this.  The ULP uses ranks "
+    "1-4, leaving 5 and 6 for easy fixups."
+    "<p>"
+    "Usage: RUN pinpoly [ <i>size</i> ]"
+    "<p> "
+    "<author>Author: Bill Westfield (westfw at yahoo)</author>"
+    ;
+// THIS PROGRAM IS PROVIDED AS IS AND WITHOUT WARRANTY OF ANY KIND, EXPRESSED OR IMPLIED
+//
+// Version 1.00:  2009/12/19 by Bill Westfield.
+//       Based on Drill-aid by Cadsoft.
+
+
+/* Parameters that might be changed */
+int debugranks = 0;  // if 1, show polygon ranks in "Document" layer.
+string layer = "bottom"; // Layer for polygons.  Must be a signal layer.
+real padsize = 1.27;  // half size of polygons
+real width = 0.4;  // line width for polygons
+
+/* Internal variables */
+int rank = 1;
+string cmd = "GRID mm;\n";
+string lastsignal = "";
+string h;
+
+void center (int ix, int iy, string signal) {
+    real x = u2mm(ix);
+    real y = u2mm(iy);
+    real s = padsize;
+    
+    if (strlen(signal) == 0)
+	return;
+    
+    if (signal != lastsignal) {
+	rank = (rank+1) & 3;
+	lastsignal = signal;
+    }
+    
+    sprintf(h, "change rank %d; poly \'%s\' %.3f (%.3f %.3f) (%.3f %.3f) (%.3f %.3f) (%.3f %.3f) (%.3f %.3f);\n",
+	    rank+1, signal, width,
+	    x-s, y-s,   x-s, y+s,   // Lower left, upper left
+	    x+s, y+s,   x+s, y-s,   // Upper right, lower right
+	    x-s, y-s);		   // Back to beginning
+    cmd += h;
+    if (debugranks) {
+	sprintf(h, "change layer Document; change size %.3f; "
+		"text \'%d\' (%.3f %.3f); "
+		"change layer %s;\n",
+		s, rank+1, x-s/2, y-s/2,  layer);
+	cmd += h;
+    }
+    return;
+}
+
+if (board) board(B) {
+    if (argv[1]) {
+	padsize = strtod(argv[1]);
+    } else {
+	int Result = dlgDialog("PadPoly V1") {
+	    dlgLabel(usage);
+	    dlgLabel("&Pad polygon size mm");
+	    dlgHBoxLayout {
+		dlgRealEdit(padsize);
+		dlgStretch(1);
+		dlgPushButton("+&OK") dlgAccept();
+		dlgStretch(1);
+		dlgPushButton("-&Cancel") dlgReject();
+            }
+	};
+	if (!Result) exit (0);
+    }
+    sprintf(h, "change layer %s;\n", layer);
+    cmd += h;
+    B.elements(E) {  // Get all the pads in packages on the board.
+	E.package.contacts(C) {
+	    if (C.pad) {
+		center(C.pad.x, C.pad.y, C.signal);
+	    }
+	}
+    }
+    B.signals(S) {
+	S.vias(V) {  // and then get the vias that aren't in packages.
+	    center(V.x, V.y, S.name);
+	}
+/*  This would get the package contacts, but the order doesn't work as well.
+    S.contactrefs(C) {
+    center(C.contact.x, C.contact.y, S.name);
+    }
+*/
+    }
+    cmd += "Ratsnest;\n";
+    exit (cmd);
+}
+
+else dlgMessageBox("Start this ULP in a Board!", "OK");
+exit (0);

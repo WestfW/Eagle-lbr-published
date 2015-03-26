@@ -1,0 +1,77 @@
+#usage "<qt><b>layertoggle.ulp layernum"
+      "<p>Toggle visibility of the specified layer"
+      "<p>"
+      "<author>Author: Bill Westfield westfw@yahoo.com</author></qt>"
+      ;
+
+int MAXLAYERS = 150;			/* Just in case! */
+
+char mylayers[];
+string h, command = "display ";
+
+void display (string s) {
+  dlgMessageBox(s);
+  return;
+}
+
+if (argc < 2) {			/* Should be ulp + arg */
+    string foo="";
+    sprintf(foo, "Not enough arguments.\n"
+	    "Usually used from menus like:\n"
+	    "   run toglay <layernum> [<layernum2> ...]");
+    display(foo);
+    exit("");
+}
+
+int i, layer;
+for (i=1; i < argc; i++) {
+    layer = strtod(argv[i]);
+    if (layer > 0 && layer < MAXLAYERS) {
+	mylayers[layer] = 1;
+    }
+}
+
+if (board) board(B) {
+    B.layers(L) {
+	if (mylayers[L.number]) {
+	    if (L.visible) {
+		sprintf(h, " -%d", L.number);
+		command += h;
+	    } else {
+		sprintf(h, " %d", L.number);
+		command += h;
+	    }
+	}
+    }
+    command += ";";
+    exit(command);
+} else if (library) library(lib) {
+    lib.layers(L) {
+	if (mylayers[L.number]) {
+	    if (L.visible) {
+		sprintf(h, " -%d", L.number);
+		command += h;
+	    } else {
+		sprintf(h, " %d", L.number);
+		command += h;
+	    }
+	}
+    }
+    command += ";";
+    exit(command);
+} else if (schematic) schematic(sch) {
+    sch.layers(L) {
+	if (mylayers[L.number]) {
+	    if (L.visible) {
+		sprintf(h, " -%d", L.number);
+		command += h;
+	    } else {
+		sprintf(h, " %d", L.number);
+		command += h;
+	    }
+	}
+    }
+    command += ";";
+    exit(command);
+}
+

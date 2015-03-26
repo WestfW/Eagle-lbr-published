@@ -1,0 +1,203 @@
+#usage "<h2>Generate \"Protoboard\" Areas</h2><p>\n"
+       "<p>Run from a <i>Board</i> context."
+       "<h3><center>run protoboard [partname]</h3>"
+       "<p>Without arguments, dialog boxes (self-explanatory?) will be offered "
+       "<p>With an object name as an identifier, try to derive info from that "
+       "part's dimensions before displaying the dialog for confirmation. "
+       "<p>"
+       "<p>"
+       "<author>Author: Bill Westfield, Mar-2011 (westfw@yahoo.com)</author>"
+
+
+/*
+ * default parameters that you might want to change
+ */
+int nrows= 17;			/* Number of rows */
+int npowerbus = 0;		/* Number of (outside) pwr rails */
+int intbus = 0;			/* inside power rails (0 or 1) */
+
+string layer = "Bottom";	/* Layer for signals. */
+
+real drillsize = 1.0;		/* via drill size */
+real diameter = 0.0;		/* via diameter (0 == auto) */
+real tracewidth = 0.8;		/* trace width for signals */
+int labels = 0;			/* generate x/y labels? */
+string sigprefix = "PB";	/* prefix for signal names */
+
+real yspacing = 2.54;		/* spacing for columns */
+real xspacing = 2.54;		/* spacing for rows */
+real xstart = 0.0;		/* origin of area.  This is the */
+real ystart = 0.0;		/*  bottom left corner of the top half */
+				/*  of the the main PB body.  Sorry; that's */
+				/*  my compromise between centering and logic. */
+
+
+/*
+ * Internal variables
+ */
+string s = "";			/* standard strings for building the */
+string cmd = "";		/*   returned command. */
+int result;			/* result of config dialog */
+
+string dialogmsg = "";
+
+real x, y;
+int i, j;
+string rowname;
+
+UL_ELEMENT noelement;
+UL_ELEMENT find_element_exact(string name)
+{
+    name = strupr(name);
+    board(B) {
+	B.elements(E) {
+	    if (E.name == name) {
+		return E;
+	    }
+	}
+    }
+    return noelement;
+}
+
+void powerrail(string name, int yoffset)
+{
+    int i;
+
+    sprintf(s, "via '%s' ", name); cmd += s;
+    for (i=0; i<nrows -1; i++) {
+	if ((i % 6) == 0) {
+	    continue;
+	}
+	sprintf(s, " (%f %f)", xstart+ (i*xspacing), ystart + (yoffset*yspacing));
+	cmd += s;
+    }
+    cmd += ";\n";
+    sprintf(s, "wire '%s' ", name); cmd += s;
+    for (i=0; i<nrows -1; i++) {
+	if ((i % 6) == 0) {
+	    continue;
+	}
+	sprintf(s, " (%f %f)", xstart+ (i*xspacing), ystart + (yoffset*yspacing));
+	cmd += s;
+    }
+    cmd += ";\n";
+}
+
+/* main() */
+
+if (argc == 2) {
+    UL_ELEMENT pb = find_element_exact(argv[1]);
+    if (pb) {
+/*
+ * A protoboard part already exists on the board.
+ * Fill in the PCB pattern needed.
+ */
+	int xsize, ysize;
+
+	xstart = u2mm(pb.x);
+	ystart = u2mm(pb.y);
+	xsize = pb.package.area.x2 - pb.package.area.x1;
+	ysize = pb.package.area.y2 - pb.package.area.y1;
+
+	sigprefix = argv[1];
+	nrows = (u2inch(xsize) - 0.1) / 0.1;  // guess.
+
+	if (u2inch(ysize) > 1.6) {  /* check if there are power rails */
+	    npowerbus = 1;
+	    if (u2inch(ysize) > 1.75) {	/* and guess how many */
+		npowerbus++;
+	    }
+	}
+	dialogmsg = "<p>Parameters derived from Part";
+    } else {
+	dlgMessageBox(usage);
+	exit(1);
+    }
+}
+
+result = dlgDialog("Protoboard Layout Tool" + dialogmsg) {
+    dlgHBoxLayout {
+	dlgVBoxLayout {
+	    dlgLabel("Trace Width"); 
+	    dlgRealEdit(tracewidth, 0.6, 3.0);
+	    dlgLabel("Pad Drill"); 
+	    dlgRealEdit(drillsize, 0.6, 1.5);
+	    dlgLabel("Number of Rows");
+	    dlgIntEdit(nrows, 1, 80);
+	    dlgLabel("Outside Power Rails");
+	    dlgIntEdit(npowerbus, 0, 2);
+	    dlgLabel("Center Power Rail");
+	    dlgIntEdit(intbus,    0, 1);
+	}
+	dlgStretch(1);
+	dlgVBoxLayout {
+	    dlgPushButton("+OK")    dlgAccept(1);
+	    dlgPushButton("Cancel") dlgReject(0);
+	}
+    }
+};
+
+if (!result) { exit(0); }
+
+sprintf(cmd, "grid mm; change drill %f;\n", drillsize);
+sprintf(s, "change diameter %f;\n", diameter); cmd += s;
+sprintf(s, "change width %f;\n", tracewidth); cmd += s;
+sprintf(s, "change layer %s;\n", layer); cmd += s;
+
+x = xstart;
+y = ystart;
+
+for (i=0; i < nrows; i++) {
+    /*
+     * Draw and connect the main body of the protoboard
+     */
+    rowname = "PB1" + i + "t";
+    sprintf(s, "via '%srow%dT' round ", sigprefix, i);
+    cmd += s;
+    for (j=0; j<5; j++) {
+	sprintf(s, " (%f %f)", x, y + (j*yspacing)); cmd +=s;
+    }
+    cmd += ";\n";
+    sprintf(s, "wire '%srow%dT' ", sigprefix, i); cmd += s;
+    for (j=0; j<5; j++) {
+	sprintf(s, " (%f %f)", x, y + (j*yspacing)); cmd +=s;
+    }
+    cmd += ";\n";
+
+    sprintf(s, "via '%srow%dB' round ", sigprefix, i);
+    cmd += s;
+    for (j=0; j<5; j++) {
+	sprintf(s, " (%f %f)", x, y - ((j*yspacing) + (3*yspacing))); cmd += s;
+    }
+    cmd += ";\n";
+    sprintf(s, "wire '%srow%dB' ", sigprefix, i); cmd +=s;
+    for (j=0; j<5; j++) {
+	sprintf(s, " (%f %f)", x, y - ((j*yspacing) + (3*yspacing))); cmd += s;
+    }
+    cmd += ";\n";
+    x += xspacing;
+}
+
+/*
+ * Draw power rails
+ */
+if (npowerbus > 0) {
+    powerrail(sigprefix+"pwr1T", 7);
+    powerrail(sigprefix+"pwr1B", -10);
+}
+
+if (npowerbus > 1) {
+    powerrail(sigprefix+"pwr2T", 8);
+    powerrail(sigprefix+"pwr2B", -11);
+}
+
+if (intbus) {
+    powerrail(sigprefix+"pwr1C", -1);
+    powerrail(sigprefix+"pwr2C", -2);
+}
+
+cmd += "grid last;\n";  /* restore grid */
+
+dlgMessageBox(cmd);
+
+exit (cmd);

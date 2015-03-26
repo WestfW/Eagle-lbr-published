@@ -1,0 +1,40 @@
+int    NotesLayer = 48;
+string NotesUnit = "mm";
+real   NotesSize = 1.6;
+int    NotesRatio = 10;
+real   NotesSpace = 2.2;
+
+string cmd = "";
+string h;
+
+void header (void)
+{
+    if (NotesLayer < 100) {
+	/*
+	 * Writing to an official layer
+	 */
+	h=""; sprintf(h, "change layer %d;", NotesLayer); cmd+=h;
+    } else {
+	/*
+	 * Create a new layer
+	 */
+    }
+    h="";sprintf(h, "grid %s; change size %f; change ratio %d;\n\n", 
+		 NotesUnit, NotesSize, NotesRatio); cmd+=h;
+}
+
+void main (void)
+{
+    string lines[];
+    int nlines, i;
+
+    nlines = fileread(lines, argv[1]);
+
+    header();
+
+    for (i=0; i < nlines; i++) {
+	h="";sprintf(h, "text '%s' (0 %f);\n", lines[i], (nlines-i)*NotesSpace); cmd+=h;
+    }
+    cmd += "\ngrid last;";
+    exit(cmd);
+}

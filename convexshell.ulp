@@ -1,0 +1,305 @@
+/*
+ * Compute a convex hull around some points
+ */
+
+int debugging = 0;  /* Run in debug mode */
+
+/*
+ * point data structures.
+ * Since ULP lacks (user-defined) complex data structures, we define a "point"
+ * as am integer index into parallel arrays that hold the data components.
+ * (x/y coordinates, polar angle, etc.)
+ */
+int npoints;
+int xcoords[];   /* Note coordinates are in internal units */
+int ycoords[];
+int iymin=0;	/* the point with the minimum Y value.   */
+real polarangle[];
+
+
+int sortindex[];  /* indirect indicies provided by sort() */
+int hull[];	  /* list of points in the hull.  This is manipulated as a stack */
+int nhull=0;      /* while running the algorithm */
+
+string cmd;	  /* command being built to return to EAGLE */
+string debug;	  /* debug messages */
+
+/*
+ * display()
+ * debugging support.  Display a string and wait for user to hit OK.
+ */
+void display (string s) {
+  dlgMessageBox(s);
+  return;
+}
+
+/*
+ * debughull
+ * Debug the list of hull points.
+ */
+void debughull(string what) {
+    string s;  int i;
+    sprintf(s, "Hull[%d] = ", nhull);
+    debug += s;
+    for (i=0; i < nhull; i++) {
+	sprintf(s, " %2d", hull[i]); debug += s;
+    }
+    debug += what;
+    debug += "\n";
+    display(debug);
+}
+
+/*
+ * standard stack operations for the hull point list
+ */
+
+void hullpush(int i)
+{
+    hull[nhull++] = i;
+/*    debughull(" push"); */
+}
+
+int hullpop() 
+{
+/*    debughull(" pop"); */
+    return hull[--nhull];
+}
+
+int hullpeek()
+{
+/*    debughull(" peek"); */
+    return hull[nhull-1]; 
+}
+
+int i = 0;
+real w=0.1, wincrement=0.1;
+
+void line(int x1, int y1, int x2, int y2, real w) {
+    string s;
+
+    sprintf(s, "wire %f (%f %f) (%f %f);",
+	    w, u2mm(x1), u2mm(y1), u2mm(x2), u2mm(y2));
+    cmd += s;
+}
+
+
+/*
+ * Draw lines to connect a list of dots, in order.
+ * since EAGLE can't pass arrays to functions, make people copy the point list
+ * into pdraw first.
+ */
+
+int pdraw[];
+void connectdots(int n, real w, real winc, string layer)
+{
+    int i;
+    string s;
+
+    sprintf(s, "change layer %s;\n", layer); cmd += s;
+
+    for (i=1; i<n; i++) {
+	line(xcoords[pdraw[i-1]], ycoords[pdraw[i-1]], 
+	     xcoords[pdraw[i]], ycoords[pdraw[i]], w);
+	w+= winc;
+    }
+    line(xcoords[pdraw[n-1]], ycoords[pdraw[n-1]], 
+	     xcoords[pdraw[0]], ycoords[pdraw[0]], w+winc);
+}
+
+/*
+ * hullccw (point a, point b, point c)
+ * determine whether a three point sequence makes a right turn or left turn
+ * beware overflow (shouldn't happen when computed in mm)
+ */
+
+int hullccw(int a, int b, int c)
+{
+    real area2, a2t;
+    string s;
+    area2 = u2mm(xcoords[b]) - u2mm(xcoords[a]);
+    area2 *= u2mm(ycoords[c]) - u2mm(ycoords[a]);
+    a2t = u2mm(ycoords[b]) - u2mm(ycoords[a]);
+    a2t *= u2mm(xcoords[c]) - u2mm(xcoords[a]);
+    area2 -= a2t;
+    if (debugging) {
+	sprintf(s, "ccw %d(%d %d) %d(%d %d) %d(%d %d) = %f\n",
+		a, int(u2mm(xcoords[a])), int(u2mm(ycoords[a])),
+		b, int(u2mm(xcoords[b])), int(u2mm(ycoords[b])),
+		c, int(u2mm(xcoords[c])), int(u2mm(ycoords[c])),
+		area2);
+	debug += s;
+    }
+    if (area2 < 0) return -1;
+    else if (area2 > 0) return 1;
+    return 0;
+}
+
+/*
+ * Given a circle (EAGLE data structure), decompose it into a set of
+ * points suitable for the  hull algorithm.  Be sure that the points
+ * are not too far apart!
+ */
+real maxlen = 4.0;
+int circ2points(UL_CIRCLE C, int i)
+{
+    real a;
+    real dt = asin(maxlen/(2*u2mm(C.radius)));
+
+    if (dt > PI/10)
+	dt = PI/10;
+/*
+    if (u2mm(C.radius) > 20)
+	npc = 2*PI/40.0;
+*/
+
+    for (a=0; a<= 2*PI; a += dt) {
+	xcoords[i] = C.x + C.radius * cos(a);
+	ycoords[i] = C.y + C.radius * sin(a);
+	if (ycoords[i] < ycoords[iymin]) {
+	    iymin = i;
+	}
+	i+=1;
+    }
+    return i;
+}
+
+
+/*
+ * findpoints
+ * Go through the board data structure and gather the points we're using
+ * as candidates for our convex hull.  (Pick circles from some specific layer?)
+ * Lacking data structurs, "points" are identified by an integer index to
+ * global arrays that contain the relevant data (xcoords, ycoords, polarangle)
+ * While we're at it, find the point with min Y value.
+ *
+ * initializes 
+ */
+
+void findpoints()
+{
+    int i =0;
+    string s;
+
+    cmd += "Change layer tNames; Change size 2;";
+
+    board(B) {
+	B.circles(C) {
+	    if (u2mm(C.radius) > 1) {
+		i = circ2points(C, i);
+	    } else {
+		xcoords[i] = C.x;
+		ycoords[i] = C.y;
+		if (C.y < ycoords[iymin]) {
+		    iymin = i;
+		}
+		if (debugging) {
+		    sprintf(s, "text ' %d' (%f %f);", i, u2mm(C.x), u2mm(C.y));
+		    cmd += s;
+		}
+		i += 1;
+	    }
+	}
+	npoints = i;
+	if (1 + debugging) {
+	    sprintf(s, "Found %d points", i);
+	    display(s);
+	}
+    }
+}
+
+/*
+ * Compute polar angles made by each point relative to our min-Y point.
+ * This wants atan2(), but we don't have it.  Simulate its behavior instead.
+ */
+void computeangles()
+{
+    string s;
+    real a;
+    int pickedx, pickedy;
+    real xt, yt;
+
+    /*
+     * Pick one point and compute polar angles to other points.
+     */
+    cmd += "change width 0.1; set WIRE_bend 2; change layer bPlace;";
+    pickedx = xcoords[iymin];
+    pickedy = ycoords[iymin];
+    for (i=0; i < npoints; i++) {
+	xt = u2mm(xcoords[i] - pickedx);
+	yt = u2mm(ycoords[i] - pickedy);
+	if (xt > 0) {
+ 	    a = atan(yt/xt);
+	} else if (xt < 0) {
+	    a = atan(yt/xt) + PI;
+	} else {
+	    if (yt == 0) /* Same point ? */
+		a = -1;  /* minimum? */
+	    else
+		a = PI/2;
+	}
+	polarangle[i] = a;
+	if (debugging) {
+	    sprintf(s, "atan to %d is %f\n", i, polarangle[i]);
+	    debug += s;
+	}
+    }
+}
+
+/*
+ * Use EAGLE's sort function to sort our points by polar angle.
+ */
+void sortbyangles()
+{
+    string s;
+    /*
+     * Sort by polar angle
+     */
+    sort(npoints, sortindex, polarangle);
+    if (debugging) {
+    debug += "Sorted:";
+    for (i=0; i<npoints; i++) {
+	if (debugging) {
+	    sprintf(s, " %d", sortindex[i]);
+	    debug += s;
+	}
+    }
+    debug += "\n";
+    }
+/*
+    for (i=0; i < npoints; i++)
+	pdraw[i] = sortindex[i];
+    connectdots(npoints, 0.1, 0.1, "top");
+*/
+}
+
+
+findpoints();
+computeangles();
+sortbyangles();
+
+/*
+ * Graham scan
+ * Go through our sorted list of points and discard those that result in
+ * "right" (concave) turns.
+ */
+
+hullpush(sortindex[0]);
+hullpush(sortindex[1]);
+
+for (i=2; i<npoints; i++) {
+    int top = hullpop();
+    while (hullccw(hullpeek(), top, sortindex[i]) <= 0) {
+	top = hullpop();
+    }
+    hullpush(top);
+    hullpush(sortindex[i]);
+}
+
+if (debugging) debughull("final");
+
+for (i=0; i < nhull; i++)
+    pdraw[i] = hull[i];
+connectdots(nhull, 0.8, 0, "Milling");
+
+exit(cmd);
+

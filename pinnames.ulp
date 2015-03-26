@@ -1,0 +1,48 @@
+#usage "<qt><b>pinnames i></b>"
+      "<p>Find all the pin names in a given part"
+      "<p> (ie, for creating a bus)"
+      "<p>"
+      "<author>Author: Bill Westfield westfw@yahoo.com</author></qt>"
+
+UL_PART nopart;
+UL_PART find_part_exact(string id)
+{
+    schematic(S) {
+	S.parts(P) {
+	    if (P.name == strupr(id)) {
+		return P;
+	    }
+	}
+    }
+    return nopart;	
+}
+
+string s = "";
+
+if (!schematic) {
+  dlgMessageBox(":Run me in a schematic");
+}
+if (argc < 2) {
+    dlgMessageBox(":Need a part name");
+    exit(1);
+}
+UL_PART pb = find_part_exact(argv[1]);
+
+if (!pb) {
+    dlgMessageBox(":Can't find part '"+argv[1]+"'");
+    exit(1);
+}
+
+/*
+ * We should do some magic here to create D[0..8] from sets
+ * of pin names like D0, D1, D2, D3...  But that's harder,
+ * and this is just a start.
+ */
+
+pb.device.gates(G) {
+    G.symbol.pins(P) {
+       s += P.name + ", ";
+    }
+}
+dlgMessageBox(";<b>Pins for '" + argv[1] + "' (" + pb.value + ")</b><p><tt>\n\n" + s);
+exit(0);

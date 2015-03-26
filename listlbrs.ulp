@@ -1,0 +1,8 @@
+string s="";
+
+schematic(S) {
+  S.libraries(L) {
+      s += L.name + " ";
+  } 
+  dlgMessageBox(s);
+}

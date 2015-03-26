@@ -1,0 +1,50 @@
+# Configuration Script
+#
+# This file can be used to configure the editor windows.
+
+BRD:
+
+#Menu Add Change Copy Delete Display Grid Group Move Name Quit Rect \
+#     Route Script Show Signal Split Text Value Via Window ';'  Wire Write Edit;
+script billw-brd.scr;
+
+#
+
+SCH:
+
+Grid Default;
+Change Width 0.024;
+run classes;
+script billw-sch.scr;
+
+#Menu Add Bus Change Copy Delete Display Gateswap Grid Group Invoke Junction \
+#     Label Move Name Net Pinswap Quit Script Show Split Value Window ';' \
+#     Wire Write Edit;
+
+LBR:
+
+#Menu Close Export Open Script Write ';' Edit;
+
+DEV:
+
+Grid Default;
+#Menu Add Change Copy Connect Delete Display Export Grid Move Name Package \
+#     Prefix Quit Script Show Value Window ';' Write Edit;
+script billw-lbr-dev.scr;
+
+SYM:
+
+Grid Default On;
+Change Width 0.010;
+script billw-lbr-sym.scr;
+#Menu Arc Change Copy Cut Delete Display Export Grid Group Move Name Paste \
+#     Pin Quit Script Show Split Text Value Window ';' Wire Write Edit;
+
+PAC:
+
+Grid Default On;
+Change Width 0.005;
+Change Size 0.050;
+script billw-lbr-pac.scr;
+#Menu Add Change Copy Delete Display Grid Group Move Name Pad Quit \
+#     Script Show Smd Split Text Window ';' Wire Write Edit;

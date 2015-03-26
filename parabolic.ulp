@@ -1,0 +1,30 @@
+/* User parameters to be changed */
+
+real lambda = 20.0;
+real n = 4;
+real theta_start = -100.0, theta_end = 100.0 ;
+real delta_theta = 10.0;
+
+/* Actual code starts here */
+string h, cmd ="";
+real theta;
+
+/* convert degress to radians for trig math. */
+real d2r(real deg)
+{
+    return(deg * PI)/180.0;
+}
+
+/* main */
+sprintf(h, "grid mm; mark (0 0);\n set wire_bend 2; wire "); cmd +=h;
+
+real L = n * lambda/4;
+
+for (theta = theta_start; theta <= theta_end; theta += delta_theta) {
+    real r = (2.0*L)/(1.00+cos(d2r(theta)));
+    sprintf(h, " (P %f %f)", r, theta);
+    cmd += h;
+}
+cmd += ";";
+
+exit(cmd);

@@ -1,0 +1,11 @@
+grid mm
+menu	'R {1/4 W TH : add R-US_0207/10 | \
+	   SMT1206: add R-US_R1206 \
+	}' \
+	'C: add C-US*' \
+	'CPOL: add CPOL-US*' \
+	'WIRE: add WIRE-via8@mylib4' \
+	'GND: add gnd@supply1' \
+	'VCC: add vcc@supply1' \
+    ;
+    

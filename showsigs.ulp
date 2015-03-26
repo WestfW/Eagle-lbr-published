@@ -1,0 +1,36 @@
+#usage "<b>run showsigs</b>"
+       "<author>Author: Bill Wesfield (WestfW@yahoo.com) Sep, 2010</author>"
+
+if (board) board(B) {
+     UL_SIGNAL nextsignal;
+     int match = 0;
+     string s;
+     B.signals(S) {
+         if (match != 0) {
+	     nextsignal = S;
+	     match = 2;
+	     break;
+	 }
+	 if (argc <= 1) {
+	     nextsignal = S;
+	     match = 2;
+	     break;
+	 } else {
+	     if (argv[1] == S.name) {
+	         match = 1;
+	     }
+	 }
+     } /* next signal */
+
+     sprintf(s,"match = %d, for %s", match, argv[1]);
+     status(s);
+     if (match != 2) {
+         dlgMessageBox("No more signals");
+	 exit("assign C+N 'run showsigs';");
+     }
+
+     sprintf(s, "Next signal \"%s\"", nextsignal.name);
+     sprintf(s,"assign C+N 'run showsigs %s;'; show '%s'", 
+	     nextsignal.name, nextsignal.name);
+     exit(s);
+    }

@@ -1,0 +1,20 @@
+#usage "menu : menu manipulation\n"
+       "menu add <name> <action>\n"
+       "menu delete <name>\n"
+       "menu replace <name> <newname> <newaction>\n"
+       "menu load <filename>\n"
+;
+
+#include "menu_util.ulp"
+
+menu_load("boardmenu.ulpmenu");
+
+if (argc > 1) {
+    if (argc > 2) {
+	menu_add(argv[1], argv[2]);
+    } else {
+	menu_findplace(argv[1]);
+    }
+}
+
+exit (menu_output());

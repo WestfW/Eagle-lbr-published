@@ -1,0 +1,22 @@
+int rows=10;
+int cols=10;
+real spacing=11.0;
+string cmd = "";
+
+int r, c;
+string rsig, csig, s;
+real xpos=0.0, ypos=0.0;
+
+for (r=0; r<rows; r++) {
+  sprintf(rsig, "r%d", r);
+  for (c=0; c<cols; c++) {
+     sprintf(csig, "c%d", c);
+     sprintf(s, "via '%s' round (%f %f); via '%s' square (%f %f);\n",
+                    rsig, xpos, ypos,        csig, xpos, ypos+2.54);
+     cmd += s;
+     xpos += spacing;
+   }
+   xpos = 0.0;
+   ypos += spacing;
+}
+exit(cmd);

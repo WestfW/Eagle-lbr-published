@@ -1,0 +1,465 @@
+/*
+ * menu_util.ulp
+ * A set of utilities for manipulating user-defined menus
+ *
+ * menu_load(string filename)
+ *
+ */
+
+string menu_indent = "  ";
+
+string TEMPFILE_BASE = "_menuulp.tmp";
+
+string make_tempfile()
+{
+    if (board)
+	return "BRD"+TEMPFILE_BASE;
+    if (schematic)
+	return "SCH"+TEMPFILE_BASE;
+    if (deviceset)
+	return "DEV"+TEMPFILE_BASE;
+    if (package)
+	return "PKG"+TEMPFILE_BASE;
+    if (symbol)
+	return "SYM"+TEMPFILE_BASE;
+}
+
+/*
+ * The user defined menu is created as a string array.  Each
+ *  array item two fields:  <name> and <action>, separated by whitespace
+ *   <name> contains the hierarchy of button names, separated by "/"
+ *   <action> is the eagle command that should be executed.
+ * For the examples in "help menu", for instance, we'd have
+ *  MyDisp Display None Top Bottom Pads Vias;
+ *  Grid/Fine Grid inch 0.001;
+ *  Grid/Coarse Grid inch 0.1;
+ *  
+ */
+string menudata[];	/* text strings defining the menus */
+int menu_maxitems = 0;	/* How many items in the menu? */
+
+string menunames[];	/* Just the names, for faster searching */
+int menu_names_count = 0;
+
+void display (string s) {
+  dlgMessageBox(s);
+  return;
+}
+
+int menu_set(int index, string name, string command)
+{
+    return (0);
+}
+
+int nexti;
+
+/*
+ * menu_tempsave
+ * Save the current menu structure in a temporary file, for
+ * later use by menu_add() and etc
+ */
+void menu_tempsave()
+{
+    int i;
+
+    output(make_tempfile(), "wDt") {
+	for (i=0; i < menu_maxitems; i++) {
+	    printf("%s\n", menudata[i]);
+	}
+    }
+}
+
+/*
+ * menu_load
+ * Load a menu file from the usual set of directories:
+ * current directory : .scr path
+ * (unless it looks like it contains its own path)
+ */
+int menu_load(string afilename)
+{
+    int i, nread;
+
+    if (afilename[0] == '/') {
+	/*
+	 * explicit path specified
+	 */
+	nread = fileread(menudata, afilename);
+	if (nread > 0) {
+	    menu_maxitems = nread;
+	    status("Menu_load Found " + afilename);
+	    menu_tempsave();
+	    return menu_maxitems;
+	}
+    }
+    i=0;
+    while (path_scr[i]) {
+	fileerror();			/* reset error status */
+	nread = fileread(menudata, path_scr[i] + "/" + afilename);
+	if (fileerror() == 0 && nread > 0) {
+	    menu_maxitems = nread;
+	    status("Menu_load Found " + path_scr[i] + "/" + afilename);
+	    menu_tempsave();
+	    return menu_maxitems;
+	}
+	i += 1;
+    }
+    return(0);
+}
+
+
+void menu_tempload()
+{
+    menu_load(make_tempfile());
+}
+
+/*
+ * menu_outputN
+ * routines for converting our data structure into a "menu" command
+ * as required by EAGLE.  Since the ULP language doesn't support
+ * recursion, we need as many separate functions as we have
+ * levels of menu.  Fortunately, too many levels get rapidly
+ * unweildly anyway.  We support three levels.
+ */
+
+string menu_output3(int startitem, string prefix)
+{
+    int i,j;
+    string s;
+    string thisitem;
+    string thisnext;			/* menu name */
+    char c;
+    int l, done;
+    string myindent = menu_indent + menu_indent + menu_indent;
+
+    l = strrchr(prefix, '/');
+    s = menu_indent + menu_indent + strsub(prefix,l+1) + " { \n";
+    prefix += "/";
+
+    l = strlen(prefix);
+
+    for (i= startitem; i < menu_maxitems; i++) {
+	thisnext = "";
+	thisitem = menudata[i];
+	if (strsub(thisitem, 0, l) != prefix) {
+	    nexti = i;
+	    break;
+	}
+	if (i != startitem)
+	    s += " | \n";
+	j = l;
+	c =thisitem[j];
+	done = 0;
+	do {
+	    switch (c) {
+	    case '\0':
+		/*
+		 * simple menu item; selector == command
+		 */
+		if (j > 0) {
+		    s += myindent + thisnext + "\n";
+		}
+		done = 1;
+		break;
+
+	    case '/':
+		dlgMessageBox("Too much menu nesting " + prefix + thisnext );
+		i = nexti - 1 ;
+		done = 1;
+		break;
+
+	    case '\t':
+	    case ' ':
+		/*
+		 * end of selectors, now have a string
+		 */
+		s +=  myindent + thisnext + ":" + strsub(thisitem, j+1);
+		done = 1;
+		break;
+
+	    default:
+		/*
+		 * Another char in the menu selector
+		 */
+		thisnext += c;
+		break;
+	    } /* switch */
+	    j += 1;
+	    c = thisitem[j];
+	} while (!done); /* while */
+    } /* for */
+    s += "\n" + menu_indent + menu_indent + "}\n";
+//    display(s);
+    return s;
+
+}
+
+string menu_output2(int startitem, string prefix)
+{
+    int i,j;
+    string s;
+    string thisitem;
+    string thisnext;			/* menu name */
+    char c;
+    int l, done;
+
+    s = "\'" + prefix + " { \n";
+    prefix += "/";
+
+    l = strlen(prefix);
+
+    for (i= startitem; i < menu_maxitems; i++) {
+	thisnext = "";
+	thisitem = menudata[i];
+	if (strsub(thisitem, 0, l) != prefix) {
+	    nexti = i;
+	    break;
+	}
+	if (i != startitem)
+	    s += " | \n";
+	j = l;
+	c =thisitem[j];
+	done = 0;
+	do {
+	    switch (c) {
+	    case '\0':
+		/*
+		 * simple menu item; selector == command
+		 */
+		if (j > 0) {
+		    s += menu_indent + menu_indent + thisnext + "\n";
+		}
+		done = 1;
+		break;
+	    case '/':
+		/*
+		 * 3 level menu
+		 */
+		s += menu_output3(i, prefix+thisnext);
+		i = nexti - 1 ;
+		done = 1;
+		break;
+
+	    case '\t':
+	    case ' ':
+		/*
+		 * end of selectors, now have a string
+		 */
+		s +=  menu_indent +menu_indent + thisnext + ":" + strsub(thisitem, j+1);
+		done = 1;
+		break;
+
+	    default:
+		/*
+		 * Another char in the menu selector
+		 */
+		thisnext += c;
+		break;
+	    } /* switch */
+	    j += 1;
+	    c = thisitem[j];
+	} while (!done); /* while */
+    } /* for */
+    s += "\n" + menu_indent + "}\'\n";
+//    display(s);
+    return s;
+}
+
+/*
+ * Top level output
+ */
+string menu_output()
+{
+    int i,j;
+    string s;
+    string thisitem;
+    string thistop;			/* menu name */
+    char c;
+    int l, done;
+
+    s = "MENU ";
+
+    for (i=0; i < menu_maxitems; i++) {
+	thistop = "";
+	thisitem = menudata[i];
+	j = 0;
+	c =thisitem[j];
+	done = 0;
+	do {
+	    switch (c) {
+	    case '\0':
+		/*
+		 * simple menu item; selector == command
+		 */
+		if (j > 0) {
+		    s += menu_indent + thistop + "\n";
+		}
+		done = 1;
+		break;
+	    case '/':
+		/*
+		 * 2 level menu
+		 */
+		s += menu_output2(i, thistop);
+		i = nexti-1;
+		done = 1;
+		break;
+
+	    case '\t':
+	    case ' ':
+		/*
+		 * end of selectors, now have a string
+		 */
+		s += menu_indent + "\'" + thistop + ":" + strsub(thisitem, j+1) + "\'\n";
+		done = 1;
+		break;
+
+	    default:
+		/*
+		 * Another char in the menu selector
+		 */
+		thistop += c;
+		break;
+	    } /* switch */
+	    j += 1;
+	    c = thisitem[j];
+	} while (!done); /* while */
+    } /* for */
+    s += " ;";
+//    display(s);
+    return s;
+}
+
+
+
+
+
+string menu_index[];
+void menu_buildindex()
+{
+    string thisitem, thiskey;
+    int i, j, l;
+
+    for (i=0; i < menu_maxitems; i++) {
+	thiskey = "";
+	thisitem = menudata[i];
+	l = strlen(thisitem);
+	for (j=0; j<l; j++) {
+	    if (thisitem[j] == ' ' || thisitem[j] == '\t')
+		break;
+	    thiskey += thisitem[j];
+	}
+	sprintf(menu_index[i], "%s\t%d", strlwr(thiskey), i);
+    }
+//    display(strjoin(menu_index, '\n'));
+}
+
+/*
+ * specialized string compare for searching menu structure
+ * return the position of non-matching char
+ */
+int menu_strmatch (string shortstring, string longstring)
+{
+    int i, l;
+
+    shortstring = strlwr(shortstring);
+    longstring = strlwr(longstring);
+    l = strlen(shortstring);
+
+    for (i=0; i<l; i++) {
+	if (shortstring[i] != longstring[i])
+	    return i;
+    }
+    display("exact match "+shortstring + " in \n"+longstring);
+    return i;
+}
+
+/*
+ * int menu_findplace(name)
+ * Find the place in our data structure to put a particular menu command.
+ * This will be either the end of the list for a new top-level command,
+ * the end of the existing nested structure for non top-level commands (a
+ * new item is created and the array is shifted), or the slot where the
+ * command is already defined.
+ */
+
+int menu_findplace(string name)
+{
+    int i,j;
+    int maxmatchlen, matchidx;
+    int thismatch;
+
+    maxmatchlen = 0; matchidx = 0;
+    for (i=0; i < menu_maxitems; i++) {
+	thismatch = menu_strmatch(name, menudata[i]);
+	if (name[thismatch] == '\0') {
+	    /*
+	     * exact match
+	     */
+	    matchidx = i;
+	    maxmatchlen = 999;
+	    break;
+	}
+	if (thismatch >= maxmatchlen) {
+	    matchidx = i;
+	    maxmatchlen = thismatch;
+	}
+    }
+    switch (maxmatchlen) {
+    case 0:
+	/*
+	 * no match
+	 */
+	menu_maxitems++;
+	matchidx = menu_maxitems-1;
+	break;
+
+    case 999:
+	/*
+	 * exact match
+	 */
+	break;
+
+    default:
+	
+	/*
+	 * Match on keyword boundry.  Need to insert a new command.
+	 */
+	if (menudata[matchidx][maxmatchlen-1] == '/') {
+	    matchidx++;
+	    for (i = menu_maxitems+1; i > matchidx; i--) {
+		menudata[i] = menudata[i-1];
+	    }
+	    menudata[matchidx] = "";
+	    menu_maxitems++;
+	} else {
+	    /*
+	     * Trailing substring matches something.  Ick.
+	     */
+    }
+
+    if (maxmatchlen > 0) {
+	if (maxmatchlen == 999)
+	    display(strjoin(menudata, '\n') + "\n EXACT MATCH at " + menudata[matchidx] );
+	else
+	    display (strjoin(menudata, '\n') + "\n INSPOINT at " + menudata[matchidx] );
+    }
+    return matchidx;
+}
+
+void menu_add(string name, string command)
+{
+    int addidx;
+
+    addidx = menu_findplace(name);
+    if (menudata[addidx] != "") {
+	sprintf(menudata[addidx], "%s\t%s", name, command);
+    }
+}
+
+
+
+
+
+
+
+

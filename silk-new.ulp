@@ -1,0 +1,478 @@
+#usage "<b>Generate a  silk screen with new line widths</b><p>\n"
+       "           run silk-new [width [ratio [moreoptions]]] \n"
+       "defaults:                  8      16     1\n\n"
+       "Without arguments, dialog boxes (self-explanatory?) will be offered\n"
+       "Some board manufacturers want to have at least a width of 8mil "
+       "for silk screen lines in order to guarantee legible results. "
+       "EAGLE libraries use 5 mil width for silk screen as default. "
+       "Other applications require other line widths."
+       "This ULP changes all silk screen elemtents to a new width "
+       "All simple and package elements of layers 21 and 22 "
+       "are written into new layers 121(_tplace) and 122 (_bplace). "
+       "Texts are changed as well, perhaps including tNames, tValues,"
+       "bNames, bValues.  The default new ratio of 16% (normally 8). That "
+       "means texts with a size of 50 mil get a wire width of 8 mil as well. "
+       "Enter a value of 0 for text ratio to compute the ratio based on line width."
+       "<p>"
+       "Two new layers will be defined and the new silk screen will be "
+       "generated. For generating GERBER data be aware that you have to "
+       "activate layers 121 or 122 instead of the original layers 21 and 22. "
+       "<p>"
+       "<author>Author: Richard Hammerl 26-05-1998, Changed for EAGLE 4.0  26-02-2002, support@cadsoft.de, updated considerably by Bill Westfield Jul-2002</author>"
+
+/* Editted rather extensively  7/2002 by Bill Westfield:
+ *
+ * provide for shrinking the silkscreen width as well as growing it.
+ * fix copying of text on xNames, xValues layers.
+ * modularize somewhat more.
+ * fix copying of smashed text.
+ * fix copying of objects not part of packages (user objects).
+ * Add dialogs to control width, ratio, and the new options.
+ * speed up scripts slightly by avoiding unncessary setting of layer.
+ * use "0" ration to compute text ratios based on desired line width.
+ */
+
+                            // Define your own default silk screen width here
+real Silkwidth  = 8.0 ;     // in mil
+int  NewTextRatio  = 16 ;   // and the new text ratio
+                            //
+
+int  source, newlay, tplace = 21,
+                     bplace = 22,
+                     offset = 100;
+int oldlayer = -1;
+
+int supressdialog = 0;		/* Skip looking at the generated script */
+
+enum {
+  RECT_COPY=0,			/* Copy rectangles as is */
+  RECT_HLINE=1,			/* Replace with horizontal line */
+  RECT_VLINE=2,			/* Replace with vertical line */
+  RECT_LLINE = 3,		/* Replace with line in "long" direction */
+  RECT_OUTLINE = 4,		/* Replace with outline */
+  RECT_MAX
+};
+
+int shrinksilk = 1,		/* Shrink silkscreen objects that are too big */
+    growsilk= 1,		/* grow silkscreen objects that are too small */
+    userobj = 1,		/* Move user objects from tplace and bplace. */
+    changerect = 0,		/* Change rectangle to outlines */
+    donames = 1,		/* Copy text of xNames */
+    dovalues = 0,		/* Copy text of xValues */
+    dummy;
+int rect_opt=RECT_COPY;		/* Options for rectangle */
+
+int polyhash = 0;
+
+string TextOrientation;
+string cmd = "SET UNDO_LOG OFF;\n"; // advisable for speed reasons
+string h;
+
+void Fatal(string Message, string Details)
+{
+  dlgMessageBox(usage + "<hr><b>ERROR: " + Message + "</b><p>\n" + Details);
+  exit(1);
+}
+
+void header(void) {
+  cmd += "display -tplace -bplace;\n";
+  if (donames) {
+    cmd += "display -tnames -bnames;\n";
+  }
+  if (dovalues) {
+    cmd += "display -tvalues -bvalues;\n";
+  }
+  /*
+   * Here you can change the new layers names and colors
+   */
+  h = "";sprintf(h, "layer %d _tplace;\n", tplace+offset);cmd += h;
+  h = "";sprintf(h, "layer %d _bplace;\n", bplace+offset);cmd += h;
+
+  h = "";sprintf(h, "set color_layer %d yellow;\n", tplace+offset);cmd += h;
+  h = "";sprintf(h, "set color_layer %d yellow;\n", bplace+offset);cmd += h;
+
+  h = "";sprintf(h, "set wire_bend 2;\nChange style continuous;\n");cmd += h;
+  h = "";sprintf(h, "\nGRID mil;\n");cmd += h;
+  if (polyhash) {
+    cmd += "\nchange pour hatched\n";
+  } else {
+    cmd += "\nchange pour solid;\n";
+  }
+  cmd += "\n";
+}
+
+void dialog (void) {
+  int result = 0;
+
+  if (argc > 1) {
+    /*
+     * If there are arguments, they can set the defaults and prevent us from
+     * entering the interactive dialog.
+     */
+    result = 1;			/* No dialog with arguments */
+    supressdialog = 1;
+    if (argv[1]) {
+      Silkwidth = strtod(argv[1]);
+      if (Silkwidth <= 0)
+         Fatal("Illegal width: " + argv[1], "The <i>width</i> must be greater than zero.");
+      if (argv[2]) {
+         NewTextRatio = strtol(argv[2]);
+	 if (NewTextRatio <= 0) {
+            Fatal("Illegal ratio " + argv[2], "The <i>ratio</i> must be greater than zero.");
+	 }
+         if (argv[3]) {
+	   result = 0;		/* use dialog for additional otpions */
+	 }
+      }
+    }
+  }
+  if (result)
+    return;
+
+  result = dlgDialog("Silkscreen line width modification") {
+    dlgHBoxLayout {
+      dlgVBoxLayout {
+	dlgLabel("New Line Width"); 
+	dlgRealEdit(Silkwidth, 0.0, 99.0);
+	dlgLabel("New Text Ratio"); 
+	dlgIntEdit(NewTextRatio, 0, 99);
+      }
+      dlgGroup("Options") {
+	dlgCheckBox("Shrink widths", shrinksilk);
+	dlgCheckBox("Expand widths", growsilk);
+	dlgCheckBox("Include xNames text", donames);
+	dlgCheckBox("Include xValues text", dovalues);
+	dlgCheckBox("User-drawn objects", userobj);
+	dlgCheckBox("Rectangle Options", changerect);
+      }
+      dlgStretch(1);
+      dlgVBoxLayout {
+	dlgPushButton("+OK")    dlgAccept(1);
+	dlgPushButton("Cancel") dlgReject(0);
+      }
+    }
+  };
+  if (!result){
+    exit(0);
+  }
+  if (changerect) {
+    dlgDialog("Silkscreen Rectangle Options") {
+      dlgGroup("") {
+	dlgRadioButton("Copy Rectangle", rect_opt);
+	dlgRadioButton("Horizontal line", rect_opt);
+	dlgRadioButton("Vertical line", rect_opt);
+	dlgRadioButton("Longest line", rect_opt);
+	dlgRadioButton("Outline", rect_opt);
+	dlgCheckBox("Hash Polygons", polyhash);
+      }
+      dlgPushButton("+OK")    dlgAccept(1);
+    };
+  }
+}
+
+/*
+ * Change the layer for drawing, IF and only if we need to.
+ */
+void newlayer(int layer) {
+ if (oldlayer != layer) {
+     h = "";sprintf(h, "Layer %d;\n", layer);cmd += h;
+     oldlayer = layer;
+ }      
+}
+
+/*
+ * Copy user-draw "wires" (lines) from the old silkscreen layers to
+ * the new layers
+ */
+void doWires(UL_WIRE W) {
+  if (W.layer != source)
+    return;
+  if ((growsilk && u2mil(W.width) <= Silkwidth) ||
+      (shrinksilk && u2mil(W.width) > Silkwidth)) {
+    newlayer(newlay);
+    h = "";
+    sprintf(h, "WIRE %5.3f (%5.3f %5.3f) (%5.3f %5.3f);\n",
+	    Silkwidth, u2mil(W.x1), u2mil(W.y1), u2mil(W.x2), u2mil(W.y2));
+    cmd += h;
+  } else {
+    newlayer(newlay);
+    h = "";
+    sprintf(h, "WIRE %5.3f (%5.3f %5.3f) (%5.3f %5.3f);\n",
+	   u2mil(W.width), u2mil(W.x1), u2mil(W.y1), u2mil(W.x2), u2mil(W.y2));
+    cmd += h;
+  }
+}
+
+/*
+ * Copy user-draw circles and arcs
+ */
+void doCircles(UL_CIRCLE C) {
+  if (C.layer != source)
+    return;
+  if (C.width != 0 && (growsilk && u2mil(C.width) <= Silkwidth ||
+      shrinksilk && u2mil(C.width > Silkwidth))) {
+    newlayer(newlay);
+    h = "";
+    sprintf(h, "CIRCLE %5.3f (%5.3f %5.3f) (%5.3f %5.3f);\n",
+	    Silkwidth, u2mil(C.x), u2mil(C.y), u2mil(C.x + C.radius), u2mil(C.y));cmd += h;
+  } else {
+    newlayer(newlay);
+    h = "";sprintf(h, "CIRCLE %5.3f (%5.3f %5.3f) (%5.3f %5.3f);\n",
+		   u2mil(C.width), u2mil(C.x), u2mil(C.y), u2mil(C.x + C.radius), u2mil(C.y));cmd += h;
+  }
+}
+
+void doArcs(UL_ARC A) {
+  if (A.layer != source)
+    return;
+  if (growsilk && u2mil(A.width) <= Silkwidth ||
+      shrinksilk && u2mil(A.width > Silkwidth)) {
+    newlayer(newlay);
+    h = "";sprintf(h, "ARC %5.3f ccw (%5.3f %5.3f) (%5.3f %5.3f) (%5.3f %5.3f);\n",
+		   Silkwidth, u2mil(A.x1), u2mil(A.y1), u2mil(2*(A.xc)-A.x1),
+		   u2mil(2*(A.yc) - A.y1), u2mil(A.x2), u2mil(A.y2));cmd += h;
+  } else {
+    newlayer(newlay);
+    h = "";sprintf(h, "ARC %5.3f ccw (%5.3f %5.3f) (%5.3f %5.3f) (%5.3f %5.3f);\n",
+		   u2mil(A.width), u2mil(A.x1), u2mil(A.y1), u2mil(2*(A.xc)-A.x1),
+		   u2mil(2*(A.yc) - A.y1), u2mil(A.x2), u2mil(A.y2));cmd += h;
+  }
+}
+
+/*
+ * Copy rectangles from the normal silkscreen layers to the new layers.
+ * There are several options here, aimed at PCB production via CNC milling
+ * or similar processes.  These replace rectangles with line segments in
+ * an assortment of maybe-useful fashions...
+ */
+
+void doRects(UL_RECTANGLE R) {
+  if (R.layer != source)
+    return;
+  newlayer(newlay);
+  switch (rect_opt) {
+  case RECT_COPY:
+    /*
+     * For the normal case, the rectangle is just copied to the new layer.
+     */
+    h = "";sprintf(h, "RECT (%5.3f %5.3f) (%5.3f %5.3f);\n", u2mil(R.x1),
+		   u2mil(R.y1), u2mil(R.x2), u2mil(R.y2)); cmd += h;
+    break;
+  case RECT_VLINE:
+    h="";
+    sprintf(h, "WIRE %5.3f (%5.3f %5.3f) (%5.3f %5.3f);\n", Silkwidth,
+	    u2mil((R.x1+R.x2)/2), u2mil((R.y1)),
+	    u2mil((R.x1+R.x2)/2), u2mil((R.y2)));
+    cmd += h;
+    break;
+  case RECT_HLINE:
+    h="";
+    sprintf(h, "WIRE %5.3f (%5.3f %5.3f) (%5.3f %5.3f);\n", Silkwidth,
+	    u2mil((R.x1)), u2mil((R.y1+R.y2)/2),
+	    u2mil((R.x2)), u2mil((R.y1+R.y2)/2));
+    cmd += h;
+    break;
+  case RECT_OUTLINE:
+    h = "";
+    sprintf(h, "WIRE %5.3f (%5.3f %5.3f) (%5.3f %5.3f) (%5.3f %5.3f) (%5.3f %5.3f) (%5.3f %5.3f);\n",
+	    Silkwidth, u2mil(R.x1), u2mil(R.y1), u2mil(R.x2), u2mil(R.y1),
+	               u2mil(R.x2), u2mil(R.y2), u2mil(R.x1), u2mil(R.y2),
+                       u2mil(R.x1), u2mil(R.y1));
+    cmd += h;
+    break;
+  case RECT_LLINE:
+    h = "";
+    if (abs(R.x1-R.x2) > abs(R.y1-R.y2)) {
+      sprintf(h, "WIRE %5.3f (%5.3f %5.3f) (%5.3f %5.3f);\n", Silkwidth,
+	      u2mil((R.x1)), u2mil((R.y1+R.y2)/2),
+	      u2mil((R.x2)), u2mil((R.y1+R.y2)/2));
+    } else {
+      sprintf(h, "WIRE %5.3f (%5.3f %5.3f) (%5.3f %5.3f);\n", Silkwidth,
+	    u2mil((R.x1+R.x2)/2), u2mil((R.y1)),
+	    u2mil((R.x1+R.x2)/2), u2mil((R.y2)));
+    }
+    cmd += h;
+    break;
+  default:
+    dlgMessageBox("unimplemented rectangle option");
+    break;
+  }
+}
+
+void doPoly(UL_POLYGON P) {
+  if (P.layer != source)
+    return;
+  newlayer(newlay);
+  if (growsilk && u2mil(P.width) <= Silkwidth ||
+      shrinksilk && u2mil(P.width > Silkwidth)) {
+        P.wires(WP) {
+          h = "";sprintf(h, "POLYGON %5.3f (%5.3f %5.3f)\n ",Silkwidth, u2mil(WP.x1), u2mil(WP.y1));cmd += h;
+          break;
+        }
+        P.wires(WP) {
+          h = "";sprintf(h, " (%5.3f %5.3f)", u2mil(WP.x2), u2mil(WP.y2));cmd += h;
+        }
+      h = "";sprintf(h, ";\n");cmd += h;
+  } else {
+    P.wires(WP) {
+      h = "";sprintf(h, "POLYGON %5.3f (%5.3f %5.3f)\n ",u2mil(P.width),
+		     u2mil(WP.x1), u2mil(WP.y1));cmd += h;
+      break;
+    }
+    P.wires(WP) {
+      h = "";sprintf(h, " (%5.3f %5.3f)", u2mil(WP.x2), u2mil(WP.y2));cmd += h;
+    }
+    h = "";sprintf(h, ";\n");cmd += h;
+  }
+}
+
+void doText(UL_TEXT T) {
+    int newratio;
+    if (T.layer != source &&
+	((!donames) || T.layer != 4+source) &&	/* xNames layer */
+	((!dovalues) || T.layer != 6+source))	/* xValues layer */
+      return;
+    /*
+     * If the specified ratio is zero, calculate what the ratio has to be
+     * in order to acheive the desired line width.
+     */
+    if (NewTextRatio == 0) {
+      newratio = (Silkwidth*100)/u2mil(T.size);
+    } else {
+      newratio = NewTextRatio;
+    }
+
+    if  ((growsilk && T.ratio < newratio) ||
+	  (shrinksilk && T.ratio > newratio)) {
+      newlayer(newlay);
+      h = "";sprintf(h, "Change Ratio %d;\n", newratio);cmd += h;
+      h = "";sprintf(h, "Change Size %5.3f;\n", u2mil(T.size));cmd += h;
+      h = "";sprintf(h, "TEXT '%s' %s%1.0f (%5.3f %5.3f);\n",
+		     T.value, TextOrientation, T.angle, u2mil(T.x), u2mil(T.y));cmd += h;
+    } else {
+      newlayer(newlay);
+      h = "";sprintf(h, "Change Size %5.3f;\n", u2mil(T.size));cmd += h;
+      h = "";sprintf(h, "TEXT '%s' %s%1.0f (%5.3f %5.3f);\n",
+		     T.value, TextOrientation, T.angle, u2mil(T.x), u2mil(T.y));cmd += h;
+    }
+}
+
+
+
+void searchelements(UL_ELEMENT E) {
+ newlay = source + offset; 
+ E.package.wires(W) {
+    doWires(W);
+  }
+  E.package.circles(C) {
+    doCircles(C);
+  }
+/*
+  E.package.arcs(A) {
+    doArcs(A);
+   }
+*/
+  E.package.rectangles(R) {
+    doRects(R);
+  }
+  E.package.polygons(P) {
+    doPoly(P);
+  }
+  E.texts(T) {
+    doText(T);
+  }
+  E.package.texts(T) {
+    doText(T);
+  }
+}
+
+
+
+if (board) board(B) {
+
+     header();
+     dialog();
+
+     B.elements(E) {
+      source = tplace;
+      TextOrientation = "R";
+      searchelements(E);
+
+      source = bplace;
+      TextOrientation = "MR";
+      searchelements(E);
+     }
+     if (userobj) {
+       B.texts(T) {
+	 source = tplace;	
+         newlay = source + offset;
+         TextOrientation = "R";
+	 h = "";
+	 doText(T);
+	 source = bplace;
+         newlay = source + offset;
+	 TextOrientation = "MR";
+	 doText(T);
+       }
+/*
+       B.arcs(A) {
+	 source = tplace;	
+         newlay = source + offset;
+	 doArcs(A);
+	 source = bplace;
+         newlay = source + offset;
+	 doArcs(A);
+       }
+*/
+       B.circles(C) {
+	 source = tplace;
+         newlay = source + offset;
+	 doCircles(C);
+	 source = bplace;
+         newlay = source + offset;
+	 doCircles(C);
+       }
+       B.rectangles(R)  {
+	 source = tplace;
+         newlay = source + offset;
+	 doRects(R);
+	 source = bplace;
+         newlay = source + offset;
+	 doRects(R);
+       }
+       B.wires(W) {
+	 source = tplace;
+         newlay = source + offset;
+	 doWires(W);
+	 source = bplace;
+         newlay = source + offset;
+	 doWires(W);
+       }
+       B.polygons(P) {
+	 source = tplace;
+         newlay = source + offset;
+	 doPoly(P);
+	 source = bplace;
+         newlay = source + offset;
+	 doPoly(P);
+       }
+     }
+}
+
+cmd += "SET UNDO_LOG ON;\nGrid last;\n";
+
+//  Dialog
+int Result=1;
+if (!supressdialog) {
+   Result = dlgDialog("Script to generate the new silk screen") {
+    dlgTextEdit(cmd);
+    dlgHBoxLayout {
+      dlgPushButton("+Execute") dlgAccept();
+      dlgPushButton("-Cancel") dlgReject();
+    }
+  };
+}
+if (Result == 0) exit(0);
+
+
+exit(cmd);

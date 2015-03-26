@@ -1,0 +1,32 @@
+/* User parameters to be changed */
+
+string grid = "grid mm;";	// units and grid setting
+string center = "(00 00)";	// coordinates of center point
+string cap = "flat";		// arc line cap style (flat or round.)
+				//   (rounded segments will overlap!)
+int segments = 22;		// number of segments
+int gap = 5;			// gap between segments (in degrees)
+int width = 13;			// line width for arc
+int radius = 45;		// circle radius
+
+
+/* Actual code starts here */
+int eachsegment = 360/segments;
+int i;
+string h, cmd ="";
+
+
+/* main */
+cmd = grid + "change cap " + cap + ";\n";
+sprintf(h, "mark %s;", center); cmd +=h;
+
+for (i=0; i < segments; i++) {
+  int arcstart = i * eachsegment;
+  sprintf(h, "arc ccw %d (p %d %d) (p %d %d) (p %d %d);\n",
+	width,
+	radius, arcstart,
+	radius, arcstart + 180,
+	radius, arcstart + eachsegment - gap);
+  cmd += h;
+}
+exit(cmd);

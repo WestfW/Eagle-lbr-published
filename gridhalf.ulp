@@ -1,0 +1,62 @@
+#usage "<qt><b>gridmult.ulp <mult> m|i|t"
+      "<p>Multiply the current grid setting by a factor."
+      "<p>"
+      "<author>Author: Bill Westfield westfw@yahoo.com</author></qt>"
+
+real griddistance;
+real multiplier = 1.0;
+string cmd = "";
+string units;
+string newgrid;
+UL_GRID oldgrid;
+char arg2;
+
+string gu2str (int  unittype)
+{
+  switch (unittype) {
+  case  GRID_UNIT_MIC:
+    return " mic";
+  case  GRID_UNIT_MM:
+    return " mm";
+  case  GRID_UNIT_MIL:
+    return " mil";
+  case  GRID_UNIT_INCH:
+    return " inch";
+  }
+}
+
+if (board) board(B) {
+    oldgrid = B.grid;
+} else if (library) library(L) {
+    oldgrid = L.grid;
+}
+
+if (argc > 0) {
+    if (argc > 2) {
+	if (oldgrid.unit == GRID_UNIT_INCH) {
+	    newgrid = "grid mm;";
+	} else {
+	    newgrid = "grid inch;";
+	}
+    } else newgrid = "";
+    
+    multiplier = strtod(argv[1]);
+
+    griddistance = oldgrid.distance * multiplier;
+    if (oldgrid.unit == oldgrid.unitdist) {
+	/*
+	 * original units still being used.  No conversion necessary!
+	 */
+	sprintf(cmd, "grid %f;%s\n", griddistance, newgrid);
+	exit(cmd);
+    } else {
+	/*
+	 * We have to play with units.  We could convert, but let's
+	 * switch the commands around instead (gives us compatibility
+	 * with the menus, hopefully!)
+	 */
+	sprintf(cmd, "grid %s; grid %f; grid %s;%s\n", gu2str(oldgrid.unitdist),
+		griddistance, gu2str(oldgrid.unit), newgrid);
+	exit(cmd);
+    }
+}

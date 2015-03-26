@@ -1,0 +1,20 @@
+grid mm;
+set WIDTH_MENU 0 .1 .2 .4 .6;
+grid last;
+
+menu	'Layers {\
+	    All : display ALL; | \
+	    Silkscreen : display NONE pads top tplace tnames tvalues; | \
+	    Board: display NONE pads top bottom tplace tnames tvalues tdocu bdocu bnames bvalues; | \
+	    NoNames : display -tnames -tvalues -bnames -bvalues; \
+	}' \
+	'Grid {\
+	  Toggle : run gridhalf 1 t ; info | \
+	  Smaller : run gridhalf 0.5; move | \
+	  Bigger : run gridhalf 2; move   | \
+	  Mils : GRID mil 10 lines on alt mil 1; | \
+          OnOff : grid; move \
+	}' \
+	'Circle : run circle;' \
+    ;
+    

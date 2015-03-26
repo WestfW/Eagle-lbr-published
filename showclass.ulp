@@ -1,0 +1,11 @@
+string s = "";
+int findclass = 0;
+
+if (board) board(B) {
+    B.signals(S) {
+	if (S.class.number == findclass) {
+	    s += "show "; s += S.name; s+=";\n";
+	}
+    }
+    exit( s);
+}

@@ -1,0 +1,33 @@
+int textlayers[] = { 100, 101, 102, 103, 0 };  // zero-terminated list of layers
+string outfile = "exportext.txt";	       // default export filename
+
+void maybe_output_text (UL_TEXT T)
+{
+    int i = 0;
+
+    while (textlayers[i] != 0) {
+	if (T.layer == textlayers[i]) {
+	    printf("Layer %d: \"%s\"\n", T.layer, T.value);
+	    return;
+	}
+	i++;
+    }
+}
+
+/*
+ * "main()"
+ */
+
+output(outfile, "wt") {
+    if (board) board(B) {
+	B.texts(T) {
+	    maybe_output_text(T);
+	}
+    } else if (schematic) schematic(S) {
+	S.sheets(SS) {
+	    SS.texts(T) {
+		maybe_output_text(T);
+	    }
+	}
+    }
+}

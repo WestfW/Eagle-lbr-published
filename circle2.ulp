@@ -1,0 +1,33 @@
+#usage "<qt><b>circle.ulp"
+       "<p>This ulp draws circles with a specified diameter."
+       "<p>\n"
+       "<author>Author: Bill Westfield westfw@yahoo.com</author></qt>"
+
+string cmdstart = "grid mm; ";
+string h;
+real circdia;
+real a;
+
+if (board) board(B) {
+   int Result = dlgDialog("Circle") {
+      dlgLabel(usage);
+      dlgLabel("Circle diameter\nmm");
+      dlgHBoxLayout {
+         dlgRealEdit(circdia);
+         dlgStretch(1);
+         dlgPushButton("+&OK") dlgAccept();
+         dlgStretch(1);
+         dlgPushButton("-&Cancel") dlgReject();
+         }
+      };
+   if (!Result) exit (0);
+   sprintf(h, "poly foo "); cmdstart += h;
+   for (a=0; a <= 360; a+=10) {
+       sprintf(h, "(P %f %f) ", circdia/2, a);    cmdstart += h;
+   }
+   cmdstart += ";\n";
+   exit (cmdstart);
+}
+
+
+
