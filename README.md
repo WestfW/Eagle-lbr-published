@@ -1,2 +1,2 @@
 # Eagle-lbr-published
-Librarys and User-language-programs (ULPs) for CadSoft EAGLE's Schematics/PCB editor
+User-language-programs (ULPs), scripts, and libraries for CadSoft EAGLE's Schematics/PCB editor
